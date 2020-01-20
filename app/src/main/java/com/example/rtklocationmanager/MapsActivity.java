@@ -15,8 +15,11 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.location.LocationProvider;
+import android.media.MediaScannerConnection;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
@@ -42,13 +45,17 @@ import com.google.android.gms.maps.model.PolylineOptions;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -57,24 +64,9 @@ import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
+import java.text.SimpleDateFormat;
 
 import static android.hardware.SensorManager.SENSOR_DELAY_NORMAL;
-
-
-//必要なさそうなパッケージ達
-/*import java.nio.charset.CoderMalfunctionError;
-import com.google.android.gms.maps.GoogleMap.OnMyLocationButtonClickListener;
-import android.content.Context;
-import android.content.DialogInterface;
-import com.google.android.gms.location.LocationServices;
-import android.net.Uri;
-import java.io.BufferedWriter;
-import java.io.FileOutputStream;
-import java.io.OutputStreamWriter;
-import android.media.MediaScannerConnection;
-import android.text.format.Time;
-import android.os.Environment;
-import androidx.appcompat.app.AppCompatActivity;*/
 
 //import android.location.LocationListener;
 //iplementsされてた理由とは？　いらん可能性大
@@ -93,6 +85,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     //ボタン
     private Button connectBt;
+    private Button saveBt;
     private Button startBt;
     private Button stopBt;
     private Button voiceBt;
@@ -163,7 +156,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     double[] array1 = new double[val];
     double[] array2 = new double[val];
     //double time_count = 0;
-    //String text;
+    String text;
     int measure_val = 0;
     int hori;
 
@@ -195,6 +188,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         //ボタン初期化
         connectBt = findViewById(R.id.connect_bt);
         connectBt.setOnClickListener(new ClickEvent());
+
+        saveBt = findViewById(R.id.save_bt);
+        startBt.setOnClickListener(new ClickEvent());
 
         startBt = findViewById(R.id.start_bt);
         startBt.setOnClickListener(new ClickEvent());
@@ -238,6 +234,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
     }
 
+    public static String GetNowDate() {
+
+        Calendar calendar = Calendar.getInstance();
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("MMdd_HH:mm:ss");
+        String Date = simpleDateFormat.format(calendar.getTime());
+        return Date;
+    }
 
     //アプリ立ち上げ時
     protected void onResume() {
@@ -306,9 +309,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 break;
         }
     }
-
     //GPSによる割り込み　ここまで
-
 
     //音声出力の初期設定(言語，話すスピード等)
     @Override
@@ -330,7 +331,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
-
     //音声出力の初期設定(言語，話すスピード等)　ここまで
     //マップタッチによる割り込み　ここから
     //タッチ1度目…目的地指定(デバッグ用)
@@ -351,7 +351,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     hori = 0;
                 }
             }
-            else{                                               //
+            else{
                 markerPoints.add(point);
                 options = new MarkerOptions();
                 options.position(point);
@@ -586,11 +586,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     class ClickEvent implements View.OnClickListener {
         public void onClick(View v) {
             if (v.equals(connectBt)) connect();   //bluetooth接続ボタン
+            else if (v.equals(saveBt)) voice();  //音声入力用ボタン
             else if (v.equals(startBt)) start();  //誘導開始用ボタン
             else if (v.equals(stopBt)) stop();    //誘導強制終了用ボタン
             else if (v.equals(voiceBt)) voice();  //音声入力用ボタン
         }
-
 
         private void connect() {
             if (!connectFlg) {
@@ -614,6 +614,46 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         }
 
+        private void save(){
+            //内部ストレージにtxtファイル作成
+            String gnd = GetNowDate();
+            String path = Environment.getExternalStorageDirectory().getPath() + "/" + gnd +".txt";
+            String[] paths = {Environment.getExternalStorageDirectory().toString() + "/" + gnd + ".txt"};
+            String[] mimeTypes = {"text/plain"};
+
+            try {
+                FileOutputStream fos = new FileOutputStream(path);
+                OutputStreamWriter osw = new OutputStreamWriter(fos);
+                BufferedWriter bw = new BufferedWriter(osw);
+
+                //誘導経路の緯度経度を記録------------------------------------------------------------------------------------------------
+                text = ("0" + "\t" + "目標緯度" + "\t" + "目標経度");
+                bw.write(text);
+                bw.newLine();
+                text = ("0" + "\t" + startLat+ "\t" + startLng);                               //開始位置の緯度経度
+                bw.write(text);
+                bw.newLine();
+                for (int storage_val = 0; storage_val <= hori; storage_val++) {
+                    text = ("0" + "\t" + (String.format("%.5f",pathLat[storage_val])) + "\t" + (String.format("%.5f",pathLng[storage_val])));  //途中経路の緯度経度
+                    bw.write(text);
+                    bw.newLine();
+                }
+                text = ("0" + "\t" + (String.format("%.5f",targetLat))+ "\t" + (String.format("%.5f",targetLng)));                             //目標位置の緯度経度
+                bw.write(text);
+                bw.newLine();
+                bw.flush();
+                bw.close();
+
+            } catch (IOException e) {
+                e.printStackTrace();
+
+            }
+            MediaScannerConnection.scanFile(getApplicationContext(), paths, mimeTypes, new MediaScannerConnection.OnScanCompletedListener() {
+                public void onScanCompleted(String path, Uri uri) {
+                }
+            });
+            Toast.makeText(MapsActivity.this, "保存完了" + GetNowDate(), Toast.LENGTH_SHORT).show();
+        }
 
         private void start() {
             mainTimer.cancel();
@@ -627,7 +667,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             mainTimerTask = new MainTimerTask();
             mainTimer.schedule(mainTimerTask, 0, (int) dt);    //1000[ms]間隔
         }
-
 
         private void stop() {
             mainTimer = new Timer();
@@ -643,7 +682,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 currentLng = pathLng[path_val];
             }
         }
-
 
         private void voice() {
             if (!targetFlg) {
