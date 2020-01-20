@@ -190,7 +190,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         connectBt.setOnClickListener(new ClickEvent());
 
         saveBt = findViewById(R.id.save_bt);
-        startBt.setOnClickListener(new ClickEvent());
+        saveBt.setOnClickListener(new ClickEvent());
 
         startBt = findViewById(R.id.start_bt);
         startBt.setOnClickListener(new ClickEvent());
