@@ -586,7 +586,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     class ClickEvent implements View.OnClickListener {
         public void onClick(View v) {
             if (v.equals(connectBt)) connect();   //bluetooth接続ボタン
-            else if (v.equals(saveBt)) voice();  //音声入力用ボタン
+            else if (v.equals(saveBt)) save();  //音声入力用ボタン
             else if (v.equals(startBt)) start();  //誘導開始用ボタン
             else if (v.equals(stopBt)) stop();    //誘導強制終了用ボタン
             else if (v.equals(voiceBt)) voice();  //音声入力用ボタン
