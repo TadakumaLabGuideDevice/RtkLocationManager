@@ -41,6 +41,8 @@ import com.google.android.gms.maps.UiSettings;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
+import com.google.android.gms.maps.model.BitmapDescriptor;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 
 import org.json.JSONObject;
 
@@ -121,6 +123,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     InputStream mmInStream = null;
     boolean connectFlg = false;                  //盲導盤との接続状態
     String output = null;                         //盲導盤への指令　節電用に用いる
+    int startCount = 0;
 
 
     //座標(緯度・経度)
@@ -334,12 +337,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     //音声出力の初期設定(言語，話すスピード等)　ここまで
     //マップタッチによる割り込み　ここから
     //タッチ1度目…目的地指定(デバッグ用)
-    //タッチ2回目…現在地指定(デバッグ用)
-    //タッチ3回目…目的地＆現在地リセット
+    //タッチ2回目…目的地リセット
 
     class MapClick implements GoogleMap.OnMapClickListener{
         public void onMapClick(LatLng point) {
-            if(currentFlg){                              //3回タッチすると目的地再設定 　currentFlgがtrueならこの処理
+            if(currentFlg){                              //2回タッチすると目的地再設定 　currentFlgがtrueならこの処理
                 markerPoints.clear();
                 mMap.clear();
                 targetFlg = false;
@@ -357,17 +359,22 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 options.position(point);
                 mMap.addMarker(options);
                 if(!targetFlg){ //目的地が未設定の場合
-                    targetLat = point.latitude;
+                    targetLat = point.latitude;          //目的地
                     targetLng = point.longitude;
+                    startLat = currentLat;               //現在地
+                    startLng = currentLng;
                     targetFlg = true;
+                    currentFlg = true;
+                    routeSearch();
                 }
-                else { //目的地が設定されている場合
+
+               /* else { //目的地が設定されている場合
                     startLat = point.latitude;
                     startLng = point.longitude;
                     markerPoints.add(point);
                     currentFlg = true;
                     routeSearch();                          //ルート検索＆表示
-                }
+                }*/
             }
         }
     }
@@ -518,7 +525,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
-
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
@@ -550,7 +556,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         options = new MarkerOptions();
                         options.position(voice_point);
                         mMap.addMarker(options);
+                        startLat = currentLat;
+                        startLng = currentLng;
                         targetFlg = true;
+                        currentFlg = true;
+                        routeSearch();
                     }
                     //この下で緯度経度が取得できなかった時の処理入れるべし
 
@@ -561,7 +571,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         }
     }
-
 
     //音声出力の設定
     public void toSpeech(String speech){
@@ -622,27 +631,27 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             String[] mimeTypes = {"text/plain"};
 
             try {
-                FileOutputStream fos = new FileOutputStream(path);
-                OutputStreamWriter osw = new OutputStreamWriter(fos);
-                BufferedWriter bw = new BufferedWriter(osw);
+                FileOutputStream fileOutputStream = new FileOutputStream(path);
+                OutputStreamWriter outputStreamWriter = new OutputStreamWriter(fileOutputStream);
+                BufferedWriter bufferedWriter = new BufferedWriter(outputStreamWriter);
 
                 //誘導経路の緯度経度を記録------------------------------------------------------------------------------------------------
                 text = ("0" + "\t" + "目標緯度" + "\t" + "目標経度");
-                bw.write(text);
-                bw.newLine();
+                bufferedWriter.write(text);
+                bufferedWriter.newLine();
                 text = ("0" + "\t" + startLat+ "\t" + startLng);                               //開始位置の緯度経度
-                bw.write(text);
-                bw.newLine();
+                bufferedWriter.write(text);
+                bufferedWriter.newLine();
                 for (int storage_val = 0; storage_val <= hori; storage_val++) {
-                    text = ("0" + "\t" + (String.format("%.5f",pathLat[storage_val])) + "\t" + (String.format("%.5f",pathLng[storage_val])));  //途中経路の緯度経度
-                    bw.write(text);
-                    bw.newLine();
+                    text = ("0" + "\t" + (String.format("%.8f",pathLat[storage_val])) + "\t" + (String.format("%.8f",pathLng[storage_val])));  //途中経路の緯度経度
+                    bufferedWriter.write(text);
+                    bufferedWriter.newLine();
                 }
-                text = ("0" + "\t" + (String.format("%.5f",targetLat))+ "\t" + (String.format("%.5f",targetLng)));                             //目標位置の緯度経度
-                bw.write(text);
-                bw.newLine();
-                bw.flush();
-                bw.close();
+                text = ("0" + "\t" + (String.format("%.8f",targetLat))+ "\t" + (String.format("%.8f",targetLng)));                             //目標位置の緯度経度
+                bufferedWriter.write(text);
+                bufferedWriter.newLine();
+                bufferedWriter.flush();
+                bufferedWriter.close();
 
             } catch (IOException e) {
                 e.printStackTrace();
@@ -656,6 +665,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
 
         private void start() {
+            startCount = 1;
             mainTimer.cancel();
             mainTimer = null;
             mainTimerTask = null;
@@ -669,18 +679,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
 
         private void stop() {
+            startCount = 0;
             mainTimer = new Timer();
             mainTimer.cancel();
             mainTimer = null;
             mainTimerTask = null;
 
-            if(path_val > hori){
+            /*if(path_val > hori){
                 currentLat = targetLat;
                 currentLng = targetLng;
             }else{
                 currentLat = pathLat[path_val];
                 currentLng = pathLng[path_val];
-            }
+            }*/
         }
 
         private void voice() {
@@ -711,7 +722,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         }
     }
-
 
     //VOICEボタンイベントここから------------------------------------------------------------------------
     //音声入力の結果を受け取るために onActivityResult を設置
@@ -785,6 +795,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                         //現在位置と目標マーカーとの距離が2[m]以下になったら目標を次のマーカーへ切り替える
                         if (results[0] < 2.0) {
+                            LatLng position = new LatLng(pathLat[path_val], pathLng[path_val]);
+                            options.position(position);
+                            BitmapDescriptor icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN);
+                            options.icon(icon);
+                            mMap.addMarker(options);
                             path_val++;  //次のマーカーの更新
                         }
 
@@ -835,7 +850,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         else if (45 < deg) direction = "5";  //右
 
         //節電用　呈示する方向が切り替わった時のみ盲導盤へ指令送信
-        if (!direction.equals(output)) {
+        if (!direction.equals(output) && startCount == 1) {
             output = direction;
             try {
                 mmOutputStream.write(output.getBytes());
