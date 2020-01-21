@@ -625,9 +625,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         private void save(){
             //内部ストレージにtxtファイル作成
-            String gnd = GetNowDate();
-            String path = Environment.getExternalStorageDirectory().getPath() + "/" + gnd +".txt";
-            String[] paths = {Environment.getExternalStorageDirectory().toString() + "/" + gnd + ".txt"};
+            String getNowDate = GetNowDate();
+            String path = Environment.getExternalStorageDirectory().getPath() + "/" + getNowDate +".txt";
+            String[] paths = {Environment.getExternalStorageDirectory().toString() + "/" + getNowDate + ".txt"};
             String[] mimeTypes = {"text/plain"};
 
             try {
